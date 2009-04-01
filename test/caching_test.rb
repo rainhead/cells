@@ -5,7 +5,7 @@ require File.dirname(__FILE__) + '/testing_helper'
 require File.dirname(__FILE__) + '/cells/test_cell'
 
 
-class CellsCachingTest < Test::Unit::TestCase
+class CellsCachingTest < ActiveSupport::TestCase
   include CellsTestMethods
   
   def setup

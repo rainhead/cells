@@ -27,6 +27,7 @@ module Cell
     #     <label>password: <input name="user[password]" /></label>
     #   </div>
     def render_cell(name, state, opts = {})
+      opts[:format] ||= template_format
       cell = Cell::Base.create_cell_for(@controller, name, opts)
       cell.render_state(state)
     end
