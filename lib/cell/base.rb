@@ -215,17 +215,18 @@ module Cell
         end
       end
     end
+
     # An instructional note about inheritable attributes: an attribute is
     # inherited at the time of inheritance (class definition). Subsequent
     # changes to a base class's attribute values will not affect subclasses.
     class_inheritable_array :view_paths, :instance_writer => false
+    self.view_paths = ActionView::PathSet.new
     class_inheritable_array :view_templates, :instance_writer => false
+    self.view_templates = []
 
     class_inheritable_accessor :allow_forgery_protection
     self.allow_forgery_protection = true
 
-    self.view_paths = ActionView::PathSet.new
-    self.view_templates = []
     self.abstract_class = true
 
     controller_method :params, :session, :request
@@ -241,13 +242,18 @@ module Cell
     # Render the given state.  You can pass the name as either a symbol or
     # a string.
     def render_state(state)
-      send state
+      content = dispatch_state state
+      return content if content
       
       ### DISCUSS: are these vars really needed in state views?
       @cell       = self
       @state_name = state
 
       render_view_for_state(state)
+    end
+    
+    def dispatch_state(state)
+      send state
     end
     
     # Render the view belonging to the given state. Will raise ActionView::MissingTemplate
