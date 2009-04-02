@@ -152,6 +152,14 @@ module Cell
     class_inheritable_array :view_templates
     self.view_templates = []
     
+    def self.controller_method(*methods)
+      methods.each do |method|
+        delegate method, :to => :controller
+      end
+    end
+    
+    controller_method :params, :session, :request
+    
     def self.add_view_template(tmpl)
       self.view_templates.unshift tmpl
     end
@@ -176,9 +184,6 @@ module Cell
     self.allow_forgery_protection = true
     
     
-    delegate :params, :session, :request, :to => :controller
-    
-    
     def initialize(controller, options={})
       self.template_format = options.delete(:format)
       self.controller = controller
@@ -190,16 +195,13 @@ module Cell
     # Render the given state.  You can pass the name as either a symbol or
     # a string.
     def render_state(state)
+      send state
+      
       ### DISCUSS: are these vars really needed in state views?
       @cell       = self
       @state_name = state
 
       render_view_for_state(state)
-    end
-    
-    # Call the state method.
-    def dispatch_state(state)
-      send(state)
     end
     
     # Render the view belonging to the given state. Will raise ActionView::MissingTemplate
