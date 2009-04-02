@@ -146,43 +146,89 @@ module Cell
     attr_reader   :state_name
     attr_reader   :cell_name
     
-    cattr_accessor :abstract_class
-    cattr_accessor :view_paths
-    self.view_paths = ActionView::PathSet.new
-    class_inheritable_array :view_templates
-    self.view_templates = []
+    class << self
+      attr_accessor :abstract_class
+
+      # Forgery protection for forms
+      attr_accessor :request_forgery_protection_token
+
+      def inherited(subclass)
+        super
+        return if subclass.abstract_class?
+        subclass.add_view_template subclass.view_template
+      end
+      
+      # Creates a cell instance of the class <tt>name</tt>Cell, passing through 
+      # <tt>opts</tt>.
+      def create_cell_for(controller, name, opts={})
+        class_from_cell_name(name).new(controller, opts)
+      end
     
-    def self.controller_method(*methods)
-      methods.each do |method|
-        delegate method, :to => :controller
+      def add_view_template(tmpl)
+        self.view_templates.unshift tmpl
+      end
+    
+      def abstract_class?
+        abstract_class == true
+      end
+    
+      def view_template
+        cell_name + '/#{state}'
+      end
+      
+      # Get the name of this cell's class as an underscored string,
+      # with _cell removed.
+      #
+      # Example:
+      #  UserCell.cell_name
+      #  => "user"
+      def cell_name
+        self.name.underscore.sub(/_cell\Z/, '')
+      end
+
+      # Given a cell name, find the class that belongs to it.
+      #
+      # Example:
+      # Cell::Base.class_from_cell_name(:user)
+      # => UserCell
+      def class_from_cell_name(cell_name)
+        "#{cell_name}_cell".classify.constantize
+      end
+      
+      def controller_method(*methods)
+        methods.each do |method|
+          delegate method, :to => :controller
+        end
+      end
+      
+      # Declare a controller method as a helper.  For example,
+      #   helper_method :link_to
+      #   def link_to(name, options) ... end
+      # makes the link_to controller method available in the view.
+      def helper_method(*methods)
+        methods.flatten.each do |method|
+          master_helper_module.module_eval <<-end_eval
+            def #{method}(*args, &block)
+              @cell.send(%(#{method}), *args, &block)
+            end
+          end_eval
+        end
       end
     end
-    
-    controller_method :params, :session, :request
-    
-    def self.add_view_template(tmpl)
-      self.view_templates.unshift tmpl
-    end
-    
-    def self.abstract_class?
-      @abstract_class == true
-    end
-    
-    def self.inherited(subclass)
-      super
-      return if subclass.abstract_class?
-      subclass.add_view_template subclass.view_template
-    end
-    
-    def self.view_template
-      cell_name + '/#{state}'
-    end
-    
-    # Forgery protection for forms
-    cattr_accessor :request_forgery_protection_token
+    # An instructional note about inheritable attributes: an attribute is
+    # inherited at the time of inheritance (class definition). Subsequent
+    # changes to a base class's attribute values will not affect subclasses.
+    class_inheritable_array :view_paths, :instance_writer => false
+    class_inheritable_array :view_templates, :instance_writer => false
+
     class_inheritable_accessor :allow_forgery_protection
     self.allow_forgery_protection = true
-    
+
+    self.view_paths = ActionView::PathSet.new
+    self.view_templates = []
+    self.abstract_class = true
+
+    controller_method :params, :session, :request
     
     def initialize(controller, options={})
       self.template_format = options.delete(:format)
@@ -259,57 +305,16 @@ module Cell
       assigns
     end
       
-    # Get the name of this cell's class as an underscored string,
-    # with _cell removed.
-    #
-    # Example:
-    #  UserCell.cell_name
-    #  => "user"
-    def self.cell_name
-      self.name.underscore.sub(/_cell\Z/, '')
-    end
-
-    # Given a cell name, find the class that belongs to it.
-    #
-    # Example:
-    # Cell::Base.class_from_cell_name(:user)
-    # => UserCell
-    def self.class_from_cell_name(cell_name)
-      "#{cell_name}_cell".classify.constantize
-    end
-    
     # When passed a copy of the ActionView::Base class, it
     # will mix in all helper classes for this cell in that class.
     def include_helpers_in_class(view_klass)
       view_klass.send(:include, self.class.master_helper_module)
     end
     
-
     # Defines the instance variables that should <em>not</em> be copied to the 
     # View instance.
     def ivars_to_ignore
       ['@controller']
-    end
-    
-    
-    # Declare a controller method as a helper.  For example,
-    #   helper_method :link_to
-    #   def link_to(name, options) ... end
-    # makes the link_to controller method available in the view.
-    def self.helper_method(*methods)
-      methods.flatten.each do |method|
-        master_helper_module.module_eval <<-end_eval
-          def #{method}(*args, &block)
-            @cell.send(%(#{method}), *args, &block)
-          end
-        end_eval
-      end
-    end
-    
-    # Creates a cell instance of the class <tt>name</tt>Cell, passing through 
-    # <tt>opts</tt>.
-    def self.create_cell_for(controller, name, opts={})
-      class_from_cell_name(name).new(controller, opts)
     end
   end
 end
