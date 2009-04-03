@@ -261,7 +261,7 @@ module Cell
     protected
     
     def dispatch_state(state)
-      send state
+      send state if respond_to? state
     end
     
     # Render the view belonging to the given state. Will raise ActionView::MissingTemplate
@@ -292,7 +292,11 @@ module Cell
     end
     
     def find_template
-      view.find_template self.class.view_templates.map {|t| expand_template_name t }
+      view.find_template view_templates
+    end
+    
+    def view_templates
+      self.class.view_templates.map { |t| expand_template_name t }
     end
     
     def expand_template_name(name)
