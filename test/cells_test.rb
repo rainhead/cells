@@ -8,6 +8,7 @@ require File.dirname(__FILE__) + '/cells/cells_test_two_cell'
 require File.dirname(__FILE__) + '/cells/simple_cell'
 require File.dirname(__FILE__) + '/cells/test_cell'
 
+Cell::Base.add_view_path "vendor/plugins/cells/test/cells"
 
 module Some
   class Cell < Cell::Base
@@ -37,51 +38,25 @@ end
 # fixture for various tests -----------------------------------
 # views are located in cells/test/cells/my_test/
 class MyTestCell < Cell::Base
+  
   def direct_output
     "<h9>this state method doesn't render a template but returns a string, which is great!</h9>"
   
-  end
-  
-  def state_with_link_to
-  end
-  
-  def view_in_local_test_views_dir
-  end
-  
-  def view_with_explicit_english_translation
-  end
-  
-  def view_containing_partial
-  end
-  
-  def view_containing_partial_without_cell_name
-  end
-  
-  def view_containing_nonexistant_partial
-  end
-  
-  def view_containing_broken_partial
-  end
-  
-  def view_with_instance_var
-    @instance_variable_one = "yeah"
-    @instance_variable_two = "wow"
-    nil
-  end
-  
-  def missing_view
   end
 end
 
 # fixtures for view inheritance -------------------------------
 # views are located in cells/test/cells/my_mother_cell/
 class MyMotherCell < Cell::Base
+  attr_accessor :message
+  helper_method :message
+  
   def hello
-    @message = "hello, kid!"
+    self.message = "hello, kid!"
     nil
   end
   def bye
-    @message = "bye, you!"
+    self.message = "bye, you!"
     nil
   end
 end
@@ -89,12 +64,12 @@ end
 # views are located in cells/test/cells/my_child_cell/
 class MyChildCell < MyMotherCell
   def hello
-    @message = "hello, mom!"
+    self.message = "hello, mom!"
     nil
   end
   # view is inherited and located in cells/test/cells/my_mother_cell/bye.html.erb
   def bye
-    @message = "bye, mom!"
+    self.message = "bye, mom!"
     nil
   end
 end
@@ -112,7 +87,7 @@ end
 class CellsTest < ActionController::TestCase
   include CellsTestMethods
   
-  Cell::Base.view_paths << "#{RAILS_ROOT}/vendor/plugins/cells/test/cells"
+  Cell::Base.add_view_path "vendor/plugins/cells/test/cells"
   ### FIXME:
   #Cell::View.warn_cache_misses = true
   
@@ -125,9 +100,6 @@ class CellsTest < ActionController::TestCase
     get :call_render_cell_with_syms
     assert_response :success
     assert_tag :tag => "h9"
-
-    get :call_render_cell_with_state_view
-    assert_select "#view_with_instance_var"
   end
   
   
@@ -142,15 +114,6 @@ class CellsTest < ActionController::TestCase
     assert_selekt c, "h9"
     
     #assert_raises (NoMethodError) { cell.render_state("non_existing_state") }
-  end
-  
-  # ok
-  def test_render_state_which_needs_a_view
-    cell = MyTestCell.new(@controller)
-    
-    c= cell.render_state(:view_with_instance_var)
-    assert_selekt c, "#one", "yeah"
-    assert_selekt c, "#two", "wow"
   end
   
   
@@ -183,24 +146,19 @@ class CellsTest < ActionController::TestCase
   end
   
   # ok
-  def test_render_state_with_partial
+  def test_render_state_within_partial
     cell = MyTestCell.new(@controller)
     c = cell.render_state(:view_containing_partial)
     assert_selekt c, "#partialContained>#partial"
   end
   
-  def test_render_state_with_partial_without_cell_name
-    cell = MyTestCell.new(@controller)
-    c = cell.render_state(:view_containing_partial_without_cell_name)
-    assert_selekt c, "#partialContained>#partial"
-  end
-  
-  
   # test view inheritance -------------------------------------------------------
   
-  def test_possible_paths_for_state
+  def test_view_templates
     t = MyChildCell.new(@controller)
-    p = t.possible_paths_for_state(:bye)
+    t.state = :bye
+    t.class_eval { public :view_templates }
+    p = t.view_templates
     assert_equal "my_child/bye", p.first
     assert_equal "my_mother/bye", p.last
   end
@@ -214,7 +172,6 @@ class CellsTest < ActionController::TestCase
   
   def test_render_state_on_child_where_view_is_inherited_from_mother
     cell = MyChildCell.new(@controller)
-    puts "  rendering cell!"
     c = cell.render_state(:bye)
     assert_selekt c, "#motherBye", "bye, mom!"
   end
@@ -222,13 +179,13 @@ class CellsTest < ActionController::TestCase
   
   # test Cell::View -------------------------------------------------------------
   
-  # ok
-  def test_find_family_view_for_state
-    t = MyChildCell.new(@controller)
-    tpl = t.find_family_view_for_state(:bye, Cell::View.new(["#{RAILS_ROOT}/vendor/plugins/cells/test/cells"], {}, @controller))
+  def test_find_template
+    t = MyChildCell.new @controller
+    t.state = :bye
+    t.class_eval { public :find_template }
+    tpl = t.find_template
     assert_equal "my_mother/bye.html.erb", tpl.path
   end
-  
   
   
   # view for :instance_view is provided directly by #view_for_state.
@@ -247,10 +204,6 @@ class CellsTest < ActionController::TestCase
     assert_equal CellsTestOneCell.cell_name, "cells_test_one"
   end
   
-  def test_cell_name_suffix
-    assert_equal Cell::Base.name_suffix, "_cell"
-  end
-
   def test_class_from_cell_name
     assert_equal Cell::Base.class_from_cell_name("cells_test_one"), CellsTestOneCell
   end

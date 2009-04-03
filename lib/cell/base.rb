@@ -257,6 +257,7 @@ module Cell
     ensure
       self.state = nil
     end
+    helper_method :render_state
     
     protected
     
