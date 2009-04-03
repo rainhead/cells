@@ -1,30 +1,25 @@
 module Cell
   class View < ::ActionView::Base
-    
     attr_accessor :cell
     
-    
-    ### DISCUSS: where/how do WE set template_format (render_view_for_state)?
-    # Tries to find the passed template in view_paths. Returns the view on success-
-    # otherwise it will throw an ActionView::MissingTemplate exception.
-    def try_picking_template_for_path(template_path)
-      self.view_paths.find_template(template_path, template_format)
-    end    
-    
-    
-    def render(options = {}, local_assigns = {}, &block)
-      if partial_path = options[:partial]
-        # adds the cell name to the partial name.
-        options[:partial] = expand_view_path(partial_path)
+    # Finds the first partial from partial_names that exists.
+    def find_template(partial_names)
+      missing_template_exception = nil
+      partial_names.each do |name|
+        # we need to catch MissingTemplate, since we want to try for all possible
+        # family views.
+        begin
+          partial = view_paths.find_template(name, template_format)
+          return partial if partial
+        rescue ::ActionView::MissingTemplate => e
+          missing_template_exception ||= e
+        end
       end
-      
-      super(options, local_assigns, &block)
+      raise missing_template_exception
     end
     
-    
-    def expand_view_path(path)
-      path = "#{cell.cell_name}/#{path}" unless path.include?('/')  
-      path
+    def helper_module=(mod)
+      class_eval { include mod }
     end
   end
 end

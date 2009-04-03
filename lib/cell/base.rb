@@ -141,11 +141,6 @@ module Cell
     
     helper ApplicationHelper
     
-    attr_accessor :template_format
-    attr_accessor :controller
-    attr_reader   :state_name
-    attr_reader   :cell_name
-    
     class << self
       attr_accessor :abstract_class
 
@@ -162,6 +157,10 @@ module Cell
       # <tt>opts</tt>.
       def create_cell_for(controller, name, opts={})
         class_from_cell_name(name).new(controller, opts)
+      end
+      
+      def add_view_path(path)
+        self.view_paths << RAILS_ROOT + '/' + path
       end
     
       def add_view_template(tmpl)
@@ -227,30 +226,39 @@ module Cell
     class_inheritable_accessor :allow_forgery_protection
     self.allow_forgery_protection = true
 
+    # Set this to true in a subclass to prevent it from proposing template names
     self.abstract_class = true
 
     controller_method :params, :session, :request
     
+    attr_accessor :template_format, :controller, :layout, :state
+    
     def initialize(controller, options={})
-      self.template_format = options.delete(:format)
-      self.controller = controller
-      @cell_name  = self.class.cell_name
-      @opts       = options
-      self.allow_forgery_protection = true
+      self.controller      = controller
+      self.template_format = options.delete :format
+      options.each_pair do |k,v|
+        setter = "#{k}="
+        send setter, v if respond_to? setter
+      end
     end
-
+    
+    def cell_name
+      self.class.cell_name
+    end
+    
     # Render the given state.  You can pass the name as either a symbol or
     # a string.
     def render_state(state)
+      self.state = state
       content = dispatch_state state
       return content if content
       
-      ### DISCUSS: are these vars really needed in state views?
-      @cell       = self
-      @state_name = state
-
-      render_view_for_state(state)
+      render
+    ensure
+      self.state = nil
     end
+    
+    protected
     
     def dispatch_state(state)
       send state
@@ -259,68 +267,36 @@ module Cell
     # Render the view belonging to the given state. Will raise ActionView::MissingTemplate
     # if it can not find one of the requested view template. Note that this behaviour was
     # introduced in cells 2.3 and replaces the former warning message.
-    def render_view_for_state(state)
-      ### DISCUSS: create Cell::View directly? are there still problematic class vars in View::Base
-      view_class  = Class.new(Cell::View)
-      action_view = view_class.new(view_paths, {}, @controller)
-      action_view.cell = self
-      action_view.template_format = template_format || :html
-      
-      # Make helpers and instance vars available
-      include_helpers_in_class(view_class)
-      
-      action_view.assigns = assigns_for_view
-      
-      
-      template = find_family_view_for_state(state, action_view)
-      ### TODO: cache family_view for this cell_name/state in production mode,
-      ###   so we can save the call to possible_paths_for_state.
-      
-      action_view.render(:file => template)
+    def render
+      render_opts = {
+        :file => find_template,
+        :layout => layout
+      }
+      override_render_opts render_opts
+      view.render render_opts
     end
     
-    # Climbs up the inheritance hierarchy of the Cell, looking for a view 
-    # for the current <tt>state</tt> in each level.
-    # As soon as a view file is found it is returned as an ActionView::Template 
-    # instance.
-    def find_family_view_for_state(state, action_view)
-      missing_template_exception = nil
-      self.class.view_templates.each do |template|
-        path = eval '"' + template + '"'
-        # we need to catch MissingTemplate, since we want to try for all possible
-        # family views.
-        begin
-          if view = action_view.try_picking_template_for_path(path)
-            return view
-          end
-        rescue ::ActionView::MissingTemplate => e
-          missing_template_exception ||= e
-        end
+    # Override this in subclasses to add render options, e.g.:
+    #
+    # def override_render_opts(opts)
+    #   opts[:layout] = 'something'
+    # end
+    def override_render_opts(opts); end
+    
+    def view
+      @view ||= returning Cell::View.new(view_paths, {}, @controller) do |v|
+        v.cell = self
+        v.template_format = template_format || :html
+        v.helper_module = self.class.master_helper_module
       end
-      
-      raise missing_template_exception
     end
     
-    # Prepares the hash {instance_var => value, ...} that should be available
-    # in the ActionView when rendering the state view.
-    def assigns_for_view
-      assigns = {}
-      (self.instance_variables - ivars_to_ignore).each do |k|
-       assigns[k[1..-1]] = instance_variable_get(k)
-      end
-      assigns
-    end
-      
-    # When passed a copy of the ActionView::Base class, it
-    # will mix in all helper classes for this cell in that class.
-    def include_helpers_in_class(view_klass)
-      view_klass.send(:include, self.class.master_helper_module)
+    def find_template
+      view.find_template self.class.view_templates.map {|t| expand_template_name t }
     end
     
-    # Defines the instance variables that should <em>not</em> be copied to the 
-    # View instance.
-    def ivars_to_ignore
-      ['@controller']
+    def expand_template_name(name)
+      eval '"' + name + '"'
     end
   end
 end
