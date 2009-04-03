@@ -39,11 +39,18 @@ module Cell
   module ActionController
 
     # Equivalent to ActionController#render_to_string, except it renders a cell
-    # rather than a regular templates.
+    # rather than a regular template.
     def render_cell_to_string(name, state, opts={})
       cell = Cell::Base.create_cell_for(self, name, opts)
 
       return cell.render_state(state)
+    end
+    
+    # Render a cell and use it as the response.
+    def render_cell(name, state, opts={})
+      # ":layout => true": if there is a layout, use it.
+      layout = opts.has_key?(:layout) ? opts.delete(:layout) : true
+      render :text => render_cell_to_string(name, state, opts), :layout => layout
     end
   end
   
