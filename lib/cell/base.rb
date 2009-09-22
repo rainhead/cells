@@ -276,12 +276,13 @@ module Cell
     end
     
     # Render the given state (view) to a string.
-    def render_state(state, format=:html)
+    def render_state(state, format=nil)
       old_format = template_format
+      self.template_format = format || template_format || :html
       content = nil
       results = Benchmark.measure do
         self.state = state
-        content = dispatch_state(state, opts) || render
+        content = dispatch_state(state) || render
       end
       Rails.logger.debug "Render #{self.class.name}##{state}: #{results}"
       return content
@@ -321,7 +322,7 @@ module Cell
     
     # A Cell::View instance for rendering templates
     def view
-      @view ||= returning Cell::View.new(view_paths, {}, @controller) do |v|
+      returning Cell::View.new(view_paths, {}, @controller) do |v|
         v.cell = self
         v.template_format = template_format
         v.helper_module = self.class.master_helper_module

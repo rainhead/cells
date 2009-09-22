@@ -70,10 +70,10 @@ module Cell::Caching
   
   
   
-  def render_state_with_caching(state)
-    return render_state_without_caching(state) unless state_cached?(state) 
+  def render_state_with_caching(state, format=nil)
+    return render_state_without_caching(state, format) unless state_cached?(state) 
     
-    key = cache_key(state, call_version_proc_for_state(state))
+    key = cache_key(state, format, call_version_proc_for_state(state))
     ### DISCUSS: see sweep discussion at #cache.
     
     # cache hit:
@@ -81,7 +81,7 @@ module Cell::Caching
       return content 
     end
     # re-render:
-    return write_fragment(key, render_state_without_caching(state))
+    return write_fragment(key, render_state_without_caching(state, :format))
   end
   
   
@@ -112,8 +112,8 @@ module Cell::Caching
   end
   
   
-  def cache_key(state, args = {}) #:nodoc:
-    key_pieces = [self.class, state]
+  def cache_key(state, format, args = {}) #:nodoc:
+    key_pieces = [self.class, state, format]
         
     args.collect{|a,b| [a.to_s, b]}.sort.each{ |k,v| key_pieces << "#{k}=#{v}" }
     key = key_pieces.join('/')
