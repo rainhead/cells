@@ -1,148 +1,7 @@
+# This implementation of Cells is mostly for internal use, so there will be little documentation, and
+# the tests are guaranteed to be out of date.
+
 module Cell
-  # == Basic overview
-  #
-  # The Cell is the central notion of the cells plugin. In the fashion of the
-  # Presenter pattern, a cell encapsulates the logic and data to drive a view,
-  # independent of any controller. Cells can be rendered within other views,
-  # whether Cell views or traditional Rails/ActionView views, or directly from
-  # a controller.
-  #
-  # Cells project views for particular <em>state</em>s, which, like
-  # ActionController actions, may carry some logic. States are rendered using
-  # a template file, located using suggestions from the cell's inheritence
-  # chain.
-  #
-  # == A render_cell() cycle
-  #
-  # A typical <tt>render_cell</tt> state rendering cycle for a BlogCell in the
-  # <tt>newest_article</tt> state looks like this:
-  #   render_cell :blog, :newest_article, {...}
-  # - an instance of the class <tt>BlogCell</tt> is created, and any options
-  #   are used to configure the cell
-  # - the <em>state method</em> <tt>newest_article</tt> is executed if defined
-  # - if the method returns a string, the cycle ends, rendering the string
-  # - otherwise, the corresponding <em>state view</em> is searched. 
-  #   Usually the cell will first look for a view template in
-  #   <tt>app/cells/blog/newest_article.html. [erb|haml|...]</tt>
-  # - after the view has been found, it is rendered and returned
-  #
-  # State methods will often return <tt>nil</tt> to ensure that the appropriate
-  # template is rendered.
-  #
-  # == Design Principles
-  #
-  # A cell is a completely autonomous object and it should not know or have to know
-  # from what controller it is being rendered.  For this reason, the controller's
-  # instance variables and params hash are not directly available from the cell or
-  # its views. This is not a bug, this is a feature!  It means cells are truly
-  # reusable components which can be plugged in at any point in your application
-  # without having to think about what information is available at that point.
-  # When rendering a cell, you can explicitly pass variables to the cell in the
-  # extra opts argument hash, just like you would pass locals in partials. These
-  # options will be passed through setter methods in the style of ActiveRecord.
-  #
-  # == Directory hierarchy
-  #
-  # To get started creating your own cells, you can simply create a new directory
-  # structure under your <tt>app</tt> directory called <tt>cells</tt>.  Cells are
-  # ruby classes which end in the name Cell.  So for example, if you have a
-  # cell which manages all user information, it would be called <tt>UserCell</tt>.
-  # A cell which manages a shopping cart could be called <tt>ShoppingCartCell</tt>.
-  #
-  # The directory structure of this example would look like this:
-  #   app/
-  #     cells/
-  #       shopping_cart_cell.rb
-  #       shopping_cart/
-  #         status.html.erb
-  #         product_list.html.erb
-  #         empty_prompt.html.erb
-  #       user_cell.rb
-  #       user/
-  #         login.html.erb
-  #     helpers/
-  #       application_helper.rb
-  #       product_helper.rb
-  #       ..
-  #     views/
-  #       ..
-  #     ..
-  #
-  # The directory with the same name as the cell contains views for the
-  # cell's <em>states</em>.  A state is an executed method along with a
-  # rendered view, resulting in content. This means that states are to
-  # cells as actions are to controllers, so each state has its own view.
-  # The use of partials is deprecated with cells, it is better to just
-  # render a different state on the same cell (which also works recursively):
-  #   <h2>Summary</h2>
-  #   <%= render_state :summary %>
-  #   <h2>Content</h2>
-  #   <% entries.each do |entry| %>
-  #     <%= render_cell :entry, :body, :entry => entry %>
-  #   <% end %>
-  #
-  # Cells also can make use of helpers.  All Cells include ApplicationHelper
-  # by default, but you can add additional helpers as well with the
-  # <tt>helper</tt> and <tt>helper_method</tt> class methods:
-  #   class ShoppingCartCell < Cell::Base
-  #     helper :product
-  #     attr_accessor :entries
-  #     helper_method :entries
-  #     ...
-  #   end
-  #
-  # This will make the <tt>ProductHelper</tt> from <tt>app/helpers/product_helper.rb</tt>
-  # available from all state views from our <tt>ShoppingCartCell</tt>, and allow
-  # access to the entries instance variable from within templates.
-  #
-  # == Cell inheritance
-  #
-  # Unlike controllers, Cells can form a class hierarchy.  When a cell class
-  # is inherited by another cell class, its states are inherited as regular
-  # methods are, but also its views are inherited.  Whenever a view is looked up,
-  # the view finder first looks for a file in the directory belonging to the
-  # current cell class, but if this is not found in the application or any
-  # engine, the the search continues with file names proposed by any superclasses.
-  #
-  # The default configuration, a cell will fall back to template file names based on
-  # the names of its superclasses. For instance, when you have two cells:
-  #   class MenuCell < Cell::Base
-  #     def show
-  #     end
-  #
-  #     def edit
-  #     end
-  #   end
-  #
-  #   class MainMenuCell < MenuCell
-  #     .. # no need to redefine show/edit if they do the same!
-  #   end
-  # and the following directory structure in <tt>app/cells</tt>:
-  #   app/cells/
-  #     menu/
-  #       show.html.erb
-  #       edit.html.erb
-  #     main_menu/
-  #       show.html.erb
-  # then when you call
-  #   render_cell :main_menu, :show
-  # the main menu specific show.html.erb (<tt>app/cells/main_menu/show.html.erb</tt>)
-  # is rendered, but when you call
-  #   render_cell :main_menu, :edit
-  # cells notices that the main menu does not have a specific view for the
-  # <tt>edit</tt> state, so it will render the view for the parent class,
-  # <tt>app/cells/menu/edit.html.erb</tt>
-  #
-  #
-  # == Gettext support
-  #
-  # Cells support gettext, just name your views accordingly. It works exactly equivalent
-  # to controller views.
-  #
-  #   cells/user/user_form.html.erb
-  #   cells/user/user_form_de.html.erb
-  #
-  # If gettext is set to DE_de, the latter view will be chosen.
   class Base
     include ActionController::Helpers
     include ActionController::RequestForgeryProtection
@@ -218,7 +77,7 @@ module Cell
       def class_from_cell_name(cell_name)
         "#{cell_name}_cell".classify.constantize
       end
-      
+
       # Delegate the named method(s) to the controller
       def controller_method(*methods)
         methods.each do |method|
@@ -252,10 +111,13 @@ module Cell
     class_inheritable_accessor :allow_forgery_protection
     self.allow_forgery_protection = true
 
+    class_inheritable_accessor :default_template_format
+    self.default_template_format = :html
+
     # Set this to true in a subclass to prevent it from proposing template names
     self.abstract_class = true
 
-    controller_method :params, :session, :request
+    controller_method :params, :session, :request, :logger
     
     attr_accessor :template_format, :controller, :layout, :state
     
@@ -263,8 +125,8 @@ module Cell
     # cell to take an option, consider declaring an attr_accessor. Unrecognized
     # attributes will be silently ignored.
     def initialize(controller, options={})
-      self.controller      = controller
-      self.template_format = options.delete :format
+      self.controller = controller
+      self.template_format = self.class.default_template_format
       options.each_pair do |k,v|
         setter = "#{k}="
         send setter, v if respond_to? setter
@@ -278,11 +140,15 @@ module Cell
     # Render the given state (view) to a string.
     def render_state(state, format=nil)
       old_format = template_format
-      self.template_format = format || template_format || :html
+      self.template_format = format = format || template_format
+      self.state = state
       content = nil
       results = Benchmark.measure do
-        self.state = state
-        content = dispatch_state(state) || render
+        content = if respond_to? state
+          send(state) { |st| render(st || state, format) }
+        else
+          render(state, format)
+        end
       end
       Rails.logger.debug "Render #{self.class.name}##{state}: #{results}"
       return content
@@ -290,60 +156,43 @@ module Cell
       self.template_format = old_format
       self.state = nil
     end
-    helper_method :render_state
+    helper_method :render_state, :state
     
     protected
-    
-    # Calls the method named after the state, if such a method exists, in order to
-    # do any preparation for rendering. The called method may return a string to
-    # render instead of rendering the partial.
-    def dispatch_state(state)
-      send state if respond_to? state
-    end
     
     # Render the view belonging to the given state. Will raise ActionView::MissingTemplate
     # if it can not find one of the requested view template. Note that this behaviour was
     # introduced in cells 2.3 and replaces the former warning message.
-    def render
-      render_opts = {
-        :file => find_template,
-        :layout => layout
-      }
-      override_render_opts render_opts
+    def render(state, format)
+      view.template_format = format
+      render_opts = { :file => find_template(state) }
+      render_opts[:layout] = find_template(layout) if layout
       view.render render_opts
     end
     
-    # Override this in subclasses to add render options, e.g.:
-    #
-    # def override_render_opts(opts)
-    #   opts[:layout] = 'something'
-    # end
-    def override_render_opts(opts); end
-    
     # A Cell::View instance for rendering templates
     def view
-      returning Cell::View.new(view_paths, {}, @controller) do |v|
+      @view ||= returning Cell::View.new(view_paths, {}, @controller) do |v|
         v.cell = self
-        v.template_format = template_format
         v.helper_module = self.class.master_helper_module
       end
     end
     
     # Return the first template (ActionView::Template instance) from the view_templates
     # that exists.
-    def find_template
-      view.find_template view_templates
+    def find_template(state)
+      view.find_template view_templates(state)
     end
     
     # Process the inherited template names, interpolating values using our own instance
     # methods.
-    def view_templates
-      self.class.view_templates.map { |t| expand_template_name t }
+    def view_templates(state)
+      self.class.view_templates.map { |t| expand_template_name t, state }
     end
     
     # Interpolate data from our instance methods into a template name.
-    def expand_template_name(name)
-      eval '"' + name + '"'
+    def expand_template_name(template, state)
+      eval '"' + template + '"'
     end
   end
 end
