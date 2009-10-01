@@ -181,13 +181,13 @@ module Cell
     # Return the first template (ActionView::Template instance) from the view_templates
     # that exists.
     def find_template(state)
-      view.find_template view_templates(state)
+      view.find_template expanded_view_templates_for(state)
     end
     
     # Process the inherited template names, interpolating values using our own instance
     # methods.
-    def view_templates(state)
-      self.class.view_templates.map { |t| expand_template_name t, state }
+    def expanded_view_templates_for(state)
+      self.class.view_templates.map { |t| expand_template_name(t, state) }
     end
     
     # Interpolate data from our instance methods into a template name.
