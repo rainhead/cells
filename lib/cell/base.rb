@@ -145,7 +145,11 @@ module Cell
       content = nil
       results = Benchmark.measure do
         content = if respond_to? state
-          send(state) { |st| render(st || state, format) }
+          send(state) { |state_or_options, localvars|
+            st    = state_or_options.is_a?(Symbol) ? state_or_options : state
+            lvars = (state_or_options.is_a?(Hash) && state_or_options) || (localvars.is_a?(Hash) && localvars) || {}
+            render(st, format,lvars)
+          }
         else
           render(state, format)
         end
@@ -163,11 +167,11 @@ module Cell
     # Render the view belonging to the given state. Will raise ActionView::MissingTemplate
     # if it can not find one of the requested view template. Note that this behaviour was
     # introduced in cells 2.3 and replaces the former warning message.
-    def render(state, format)
+    def render(state, format,local_variables = {})
       view.template_format = format
-      render_opts = { :file => find_template(state) }
+      render_opts = { :file => find_template(state), :locals => local_variables }
       render_opts[:layout] = find_template(layout) if layout
-      view.render render_opts
+      view.render(render_opts)
     end
     
     # A Cell::View instance for rendering templates
