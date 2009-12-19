@@ -5,6 +5,7 @@ module Cell
   class Base
     include ActionController::Helpers
     include ActionController::RequestForgeryProtection
+    include Cell::ActionView
     
     helper ApplicationHelper
     
@@ -167,7 +168,7 @@ module Cell
     # Render the view belonging to the given state. Will raise ActionView::MissingTemplate
     # if it can not find one of the requested view template. Note that this behaviour was
     # introduced in cells 2.3 and replaces the former warning message.
-    def render(state, format,local_variables = {})
+    def render(state, format, local_variables = {})
       view.template_format = format
       render_opts = { :file => find_template(state), :locals => local_variables }
       render_opts[:layout] = find_template(layout) if layout
