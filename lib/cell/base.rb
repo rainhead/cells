@@ -5,7 +5,6 @@ module Cell
   class Base
     include ActionController::Helpers
     include ActionController::RequestForgeryProtection
-    include Cell::ActionView
     
     helper ApplicationHelper
     
