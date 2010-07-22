@@ -140,6 +140,7 @@ module Cell
     # Render the given state (view) to a string.
     def render_state(state, format=nil)
       old_format = template_format
+      old_state = self.state
       self.template_format = format = format || template_format
       self.state = state
       content = nil
@@ -158,7 +159,7 @@ module Cell
       return content
     ensure
       self.template_format = old_format
-      self.state = nil
+      self.state = old_state
     end
     helper_method :render_state, :state
     
