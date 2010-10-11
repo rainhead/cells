@@ -103,8 +103,9 @@ module Cell
     # An instructional note about inheritable attributes: an attribute is
     # inherited at the time of inheritance (class definition). Subsequent
     # changes to a base class's attribute values will not affect subclasses.
-    class_inheritable_array :view_paths, :instance_writer => false
-    self.view_paths = ActionView::PathSet.new
+    class_inheritable_reader :view_paths
+    write_inheritable_attribute(:view_paths, ActionView::PathSet.new)
+
     class_inheritable_array :view_templates, :instance_writer => false
     self.view_templates = []
 
